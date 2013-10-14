@@ -67,9 +67,9 @@ public class MatMulClient
         MatrixMultiplicator multiplicator1 =
             createHazelcastMatrixMultiplicator(executorService);
         
-        final int rA = 100;
-        final int cArB = 150;
-        final int cB = 100;
+        final int rA = 1000;
+        final int cArB = 1500;
+        final int cB = 1000;
         MatMulTests.runBasicTest(
             rA, cArB, cB, multiplicator0, multiplicator1);
     }
@@ -101,8 +101,8 @@ public class MatMulClient
         // by splitting them into blocks of size 'nodeProcessorBlockSize'
         // and passing MatMulTasks to multiply these blocks to a local 
         // thread pool executor.
-        final int clusterNodeBlockSize = 1000;
-        final int nodeProcessorBlockSize = 100;
+        final int clusterNodeBlockSize = 500;
+        final int nodeProcessorBlockSize = 50;
         Factory<MatrixMultiplicator> subMatrixMultiplicatorFactory =
             MatrixMultiplicators.createParallelFactory(nodeProcessorBlockSize);
         MatrixMultiplicator multiplicator = 
