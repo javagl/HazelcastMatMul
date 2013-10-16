@@ -20,7 +20,9 @@ distributed matrix multiplication <code>C = A * B</code>.
 The size of the matrices is currently hard-coded in the client:
 
 <code>final int rA = 1000;</code> : Number of rows in A
+
 <code>final int cArB = 1500;</code> : Number of columns in A (=number of rows in B)
+
 <code>final int cB = 1000;</code> : Number of columns in B
 
 These matrices will be split into blocks of size 500x500. These
@@ -34,7 +36,7 @@ these blocks will be performed in parallel, using a local
 thread pool.
 
 The general structure of this approach aims at supporting a hierarchical
-distribution of the workload. It is even possible to inser additional
+distribution of the workload. It is even possible to insert additional
 layers. For example, for the multiplication of two matrices with a size
 of 100000x100000, the matrices could be split into sub-matrices of size
 10000x10000 and distributed to local workstations. The local workstations
