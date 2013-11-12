@@ -56,7 +56,8 @@ public class MatMulTests
      */
     public static void main(String[] args)
     {
-        LoggerUtil.configureDefault(Logger.getLogger("de"));
+        Logger logger = Logger.getLogger("");
+        LoggerUtil.configureDefault(logger);
 
         MatrixMultiplicator multiplicator0 = 
             MatrixMultiplicators.createParallelDefault(100);
@@ -124,7 +125,7 @@ public class MatMulTests
         final boolean verify = true;
         runTest(A, B, multiplicator0, multiplicator1, runs, verify);
     }
-    
+
     /**
      * Runs a simple benchmark for comparing the given 
      * {@link MatrixMultiplicator}s by feeding them with matrices
@@ -137,20 +138,55 @@ public class MatMulTests
         MatrixMultiplicator multiplicator0,
         MatrixMultiplicator multiplicator1)
     {
-        final int minRA = 100;
-        final int maxRA = 200;
-        final int stepRA = 50;
+        final int minRA = 1000;
+        final int maxRA = 2000;
+        final int stepRA = 500;
 
-        final int minCA = 100;
-        final int maxCA = 200;
-        final int stepCA = 50;
+        final int minCA = 1000;
+        final int maxCA = 2000;
+        final int stepCA = 500;
 
-        final int minCB = 100;
-        final int maxCB = 200;
-        final int stepCB = 50;
+        final int minCB = 1000;
+        final int maxCB = 2000;
+        final int stepCB = 500;
         
-        final int runs = 5;
-        final boolean verify = true;
+        final int runs = 3;
+        
+        runBenchmark(
+            minRA, maxRA, stepRA, 
+            minCA, maxCA, stepCA, 
+            minCB, maxCB, stepCB,
+            runs,
+            multiplicator0, multiplicator1);
+    }
+
+    /**
+     * Runs a simple benchmark for comparing the given 
+     * {@link MatrixMultiplicator}s by feeding them with matrices
+     * of different sizes and printing timing information
+     * 
+     * @param minRA Minimum number of rows of A
+     * @param maxRA Maximum number of rows of A
+     * @param stepRA Step size for the rows of A
+     * @param minCA Minimum number of columns of A
+     * @param maxCA Maximum number of columns of A
+     * @param stepCA Step size for the columns of A
+     * @param minCB Minimum number of columns of B
+     * @param maxCB Maximum number of columns of B
+     * @param stepCB Step size for the columns of B
+     * @param runs The number of benchmark runs
+     * @param multiplicator0 The first {@link MatrixMultiplicator}
+     * @param multiplicator1 The second {@link MatrixMultiplicator}
+     */
+    public static void runBenchmark(
+        int minRA, int maxRA, int stepRA,
+        int minCA, int maxCA, int stepCA,
+        int minCB, int maxCB, int stepCB,
+        int runs,
+        MatrixMultiplicator multiplicator0,
+        MatrixMultiplicator multiplicator1)
+    {
+        final boolean verify = false;
         
         for (int rA = minRA; rA <= maxRA; rA += stepRA)
         {
@@ -165,7 +201,8 @@ public class MatMulTests
                     Matrices.fillRandom(A);
                     Matrices.fillRandom(B);
                     
-                    runTest(A, B, multiplicator0, multiplicator1, runs, verify);
+                    runTest(A, B, multiplicator0, multiplicator1, 
+                        runs, verify);
                 }
             }
         }

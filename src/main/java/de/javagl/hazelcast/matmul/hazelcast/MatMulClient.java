@@ -25,9 +25,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 package de.javagl.hazelcast.matmul.hazelcast;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hazelcast.client.HazelcastClient;
@@ -45,43 +51,123 @@ import de.javagl.hazelcast.matmul.MutableFloatMatrix2D;
 import de.javagl.hazelcast.matmul.util.LoggerUtil;
 
 /**
- * A Hazelcast matrix multiplication client
+ * A Hazelcast matrix multiplication client. Will perform a matrix
+ * multiplication A * B = C once locally and once in a Hazelcast
+ * cluster, and compare the results. 
  */
 public class MatMulClient
 {
     /**
+     * The logger used in this class
+     */
+    private static final Logger logger = 
+        Logger.getLogger(MatMulClient.class.getName());
+    
+    /**
+     * The number of rows in matrix A
+     */
+    private static int rowsA = 1000;
+
+    /**
+     * The number of columns in matrix A 
+     * (also the number of rows in matrix B)
+     */
+    private static int columnsA = 1000;
+    
+    /**
+     * The number of columns in matrix B
+     */
+    private static int columnsB = 1000;
+    
+    /**
+     * The size of the sub-matrices that will be dispatched
+     * to the cluster nodes.
+     */
+    private static int clusterNodeBlockSize = 500;
+    
+    /**
+     * The size of the sub-matrices that will be dispatched
+     * to a thread pool executor on each cluster node 
+     * (and in the local execution) 
+     */
+    private static int nodeProcessorBlockSize = 50;
+    
+    /**
+     * The comma-separated list of server addresses
+     */
+    private static String serverURLs = "127.0.0.1:5701";
+    
+    /**
+     * The number of benchmark steps
+     */
+    private static int benchmarkSteps = 0;
+    
+    /**
+     * The step size for benchmark runs. The matrix sizes will be 
+     * increased by this amount, {@link #benchmarkSteps} times
+     */
+    private static int benchmarkStepSize = 1000;
+    
+    /**
+     * The number of benchmark runs for each matrix size
+     */
+    private static int benchmarkRuns = 3;
+    
+    /**
+     * The HazelcastInstance for this client
+     */
+    private static HazelcastInstance hazelcastInstance; 
+    
+    /**
      * Start the client
      * 
-     * @param args Not used
+     * @param args When no arguments are given, then default settings
+     * will be used. Otherwise, it is assumed that the first argument
+     * is the name of a properties file with the settings for the
+     * test run.
      */
     public static void main(String[] args)
     {
-        LoggerUtil.configureDefault(Logger.getLogger("com"));
-        LoggerUtil.configureDefault(Logger.getLogger("de"));
+        Logger logger = Logger.getLogger("");
+        LoggerUtil.configureDefault(logger);
         
-        final ExecutorService executorService = createHazeclastExecutorService();
-        //runBasicTest(executorService);
+        String propertiesFileName = "MatMulClient.properties";
+        if (args.length != 0)
+        {
+            propertiesFileName = args[0];
+        }
+        readProperties(propertiesFileName);
+        createHazeclastInstance();
+        
+        //runBasicTest(hazelcastInstance.getExecutorService(
+        //    "matMulExecutorService"));
         
         MatrixMultiplicator multiplicator0 = 
-            MatrixMultiplicators.createParallelDefault(100);
+            MatrixMultiplicators.createParallelDefault(
+                nodeProcessorBlockSize);
         MatrixMultiplicator multiplicator1 =
-            createHazelcastMatrixMultiplicator(executorService);
+            createHazelcastMatrixMultiplicator();
         
-        final int rA = 1000;
-        final int cArB = 1500;
-        final int cB = 1000;
-        MatMulTests.runBasicTest(
-            rA, cArB, cB, multiplicator0, multiplicator1);
+        int maxRowsA = rowsA + benchmarkSteps * benchmarkStepSize;
+        int maxColumnsA = columnsA + benchmarkSteps * benchmarkStepSize;
+        int maxColumnsB = columnsB + benchmarkSteps * benchmarkStepSize;
+        MatMulTests.runBenchmark(
+            rowsA, maxRowsA,  benchmarkStepSize, 
+            columnsA, maxColumnsA, benchmarkStepSize, 
+            columnsB, maxColumnsB, benchmarkStepSize,
+            benchmarkRuns,
+            multiplicator0, multiplicator1);
+
+        hazelcastInstance.getLifecycleService().shutdown();
     }
+    
     
     /**
      * Create a {@link MatrixMultiplicator} using Hazelcast
      * 
-     * @param hazelcastExecutorService The Hazelcast ExecutorService
      * @return The {@link MatrixMultiplicator}
      */
-    private static MatrixMultiplicator createHazelcastMatrixMultiplicator(
-        final ExecutorService hazelcastExecutorService)
+    private static MatrixMultiplicator createHazelcastMatrixMultiplicator()
     {
         Factory<ExecutorService> executorServiceFactory = 
             new Factory<ExecutorService>()
@@ -89,20 +175,21 @@ public class MatMulClient
             @Override
             public ExecutorService create()
             {
-                return hazelcastExecutorService;
+                IExecutorService executorService = 
+                    hazelcastInstance.getExecutorService(
+                        "matMulExecutorService");
+                return executorService;
+            }
+            
+            @Override
+            public String toString()
+            {
+                return "hazelcastExecutorServiceFactory";
             }
         };
         
         // Creates a MatrixMultiplicator that will dispatch MatMulTask objects 
-        // to the executor service. Each MatMulTask will be the multiplication 
-        // of a matrix with size 'clusterNodeBlockSize'. These tasks will be 
-        // dispatched to the Hazelcast nodes. Each node will perform the
-        // multiplication of the matrices with size 'clusterNodeBlockSize'
-        // by splitting them into blocks of size 'nodeProcessorBlockSize'
-        // and passing MatMulTasks to multiply these blocks to a local 
-        // thread pool executor.
-        final int clusterNodeBlockSize = 500;
-        final int nodeProcessorBlockSize = 50;
+        // to the executor service. 
         Factory<MatrixMultiplicator> subMatrixMultiplicatorFactory =
             MatrixMultiplicators.createParallelFactory(nodeProcessorBlockSize);
         MatrixMultiplicator multiplicator = 
@@ -114,23 +201,122 @@ public class MatMulClient
     
     
     /**
-     * Returns the ExecutorService that is obtained from a Hazelcast client
-     * that connects to localhost
-     * 
-     * @return The ExecutorService
+     * Creates the Hazelcast Client instance
      */
-    public static ExecutorService createHazeclastExecutorService()
+    public static void createHazeclastInstance()
     {
         ClientConfig clientConfig = new ClientConfig();
         MatMulUtils.initSerializers(clientConfig.getSerializationConfig());
-        clientConfig.addAddress("127.0.0.1:5701");
-        HazelcastInstance hazelcastInstance = 
+        String urls[] = serverURLs.split(",");
+        
+        logger.info("Server URLs: "+Arrays.toString(urls));
+        
+        clientConfig.addAddress(urls);
+        hazelcastInstance = 
             HazelcastClient.newHazelcastClient(clientConfig);
-        IExecutorService executorService = 
-            hazelcastInstance.getExecutorService("matMulExecutorService");
-        return executorService;
     }
     
+    /**
+     * Read the configuration for this client, namely the fields, from
+     * a properties file with the given name.
+     * 
+     * @param fileName The name of the properties file
+     */
+    private static void readProperties(String fileName)
+    {
+        logger.info("Reading properties file '"+fileName+"'");
+
+        Properties properties = new Properties();
+        InputStream inputStream = null;
+        try 
+        {
+            inputStream = new FileInputStream(fileName);
+            properties.load(inputStream);
+        } 
+        catch (IOException e) 
+        {
+            logger.severe(
+                "Could not read properties file '"+fileName+"'. " +
+                "Using defaults");
+            logger.log(Level.SEVERE, e.getMessage(), e);
+            return;
+        }    
+        finally
+        {
+            if (inputStream != null)
+            {
+                try
+                {
+                    inputStream.close();
+                }
+                catch (IOException e)
+                {
+                    logger.warning("Could not close stream");
+                    e.printStackTrace();
+                }
+            }
+        }
+        rowsA = parseInt(properties, "rowsA", rowsA);
+        columnsA = parseInt(properties, "columnsA", columnsA);
+        columnsB = parseInt(properties, "columnsB", columnsB);
+        clusterNodeBlockSize = parseInt(
+            properties, "clusterNodeBlockSize", clusterNodeBlockSize);
+        nodeProcessorBlockSize = 
+            parseInt(
+                properties, "nodeProcessorBlockSize", nodeProcessorBlockSize);
+        serverURLs = properties.getProperty("serverURLs", serverURLs);
+        benchmarkSteps = parseInt(
+            properties, "benchmarkSteps", benchmarkSteps);
+        benchmarkStepSize = parseInt(
+            properties, "benchmarkStepSize", benchmarkStepSize);
+        benchmarkRuns = parseInt(
+            properties, "benchmarkRuns", benchmarkRuns);
+
+    }
+
+    /**
+     * Parse an integer value from the specified properties, returning 
+     * the given default value if no value could be parsed.
+     * 
+     * @param properties The properties
+     * @param name The property name
+     * @param defaultValue The default value
+     * @return The parsed integer value
+     */
+    private static int parseInt(
+        Properties properties, String name, int defaultValue)
+    {
+        return parseInt(name, properties.getProperty(name), defaultValue);
+    }
+    
+    /**
+     * Parse an integer value from the given string, returning the given
+     * default value if no value could be parsed.
+     * 
+     * @param name The name of the field
+     * @param string The string containing the integer value
+     * @param defaultValue The default value
+     * @return The parsed integer value
+     */
+    private static int parseInt(String name, String string, int defaultValue)
+    {
+        try
+        {
+            int result = Integer.parseInt(string);
+            logger.info(name+"="+result);
+            return result;
+        }
+        catch (NumberFormatException e)
+        {
+            logger.warning(
+                "Invalid value for "+name+": "+string+". " +
+                "Using default ("+defaultValue+")");
+            return defaultValue;
+        }
+    }
+    
+
+
     /**
      * Performs a single, simple matrix multiplication with the given
      * ExecutorService
@@ -163,5 +349,4 @@ public class MatMulClient
         }
         System.out.println("Result:\n"+Matrices.toString(result.getMatrix()));
     }
-    
 }

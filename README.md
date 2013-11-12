@@ -15,22 +15,16 @@ Usage
 
 After starting one or more instances of <code>de.javagl.hazelcast.matmul.hazelcast.MatMulServer</code>,
 the <code>de.javagl.hazelcast.matmul.hazelcast.MatMulClient</code> may be used to execute a 
-distributed matrix multiplication <code>C = A * B</code>.
+distributed matrix multiplication <code>A * B = C</code>.
 
-The size of the matrices is currently hard-coded in the client:
+The size of the matrices as well as basic configuration settings
+may be specified in a file <code>MatMulClient.properties</code>.
 
-<code>final int rA = 1000;</code> : Number of rows in A
-
-<code>final int cArB = 1500;</code> : Number of columns in A (=number of rows in B)
-
-<code>final int cB = 1000;</code> : Number of columns in B
-
-These matrices will be split into blocks of size 500x500. These
+With the default configuration, the client will perform the 
+multiplication of a 1000x1500 and a 1500x1000 matrix. Therefore,
+it will split these matrices into blocks of size 500x500. These
 blocks will be distributed among all running MatMulServer instances. 
-(Note: In order to really run this on multiple machines, the
-addresses of the server machines have to be added in the
-<code>createHazeclastExecutorService()</code> method). On each 
-machine, the block matrix with size 500x500 will be subdivided
+On each machine, the block matrix with size 500x500 will be subdivided
 further, into blocks of size 50x50, and the multiplication of 
 these blocks will be performed in parallel, using a local 
 thread pool.

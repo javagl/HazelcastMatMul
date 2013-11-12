@@ -145,7 +145,8 @@ public class MatrixMultiplicators
      */
     public static MatrixMultiplicator createParallelDefault(int blockSize)
     {
-        final int numberOfThreads = Runtime.getRuntime().availableProcessors();
+        final int numberOfThreads = 
+            Runtime.getRuntime().availableProcessors();
         Factory<ExecutorService> executorServiceFactory = 
             new Factory<ExecutorService>()
         {
@@ -154,6 +155,12 @@ public class MatrixMultiplicators
             {
                 return ExecutorExtensions.newExceptionAwareFixedThreadPool(
                     numberOfThreads);
+            }
+            
+            @Override
+            public String toString()
+            {
+                return "defaultExecutorServiceFactory";
             }
         };
         return new ParallelMatrixMultiplicator(

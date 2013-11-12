@@ -45,10 +45,11 @@ public class MatMulServer
      */
     public static void main(String[] args) 
     {
-        LoggerUtil.configureDefault(Logger.getLogger("com"));
-        LoggerUtil.configureDefault(Logger.getLogger("de"));
+        Logger logger = Logger.getLogger("");
+        LoggerUtil.configureDefault(logger);
         
         Config config = new Config();
+        //config.setProperty("hazelcast.logging.type", "none");
         MatMulUtils.initSerializers(config.getSerializationConfig());
         
         @SuppressWarnings("unused")

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.logging.Logger;
 
 /**
  * Implementation of a {@link MatrixMultiplicator} that uses
@@ -68,6 +69,12 @@ import java.util.concurrent.Future;
  */
 final class ParallelMatrixMultiplicator implements MatrixMultiplicator
 {
+    /**
+     * The logger used in this class
+     */
+    private static final Logger logger = 
+        Logger.getLogger(ParallelMatrixMultiplicator.class.getName());
+    
     /**
      * The factory for the ExecutorService
      */
@@ -183,6 +190,9 @@ final class ParallelMatrixMultiplicator implements MatrixMultiplicator
         final int numRowBlocks = divCeil(A.getNumRows(), blockSize);
         final int numColumnBlocks = divCeil(B.getNumColumns(), blockSize);
         final int numOuterProducts = divCeil(A.getNumColumns(), blockSize);
+        
+        logger.fine(
+            this+" creating "+numRowBlocks+"*"+numColumnBlocks+" tasks");
         
         List<MatMulTask> tasks = new ArrayList<MatMulTask>();
         for (int rb=0; rb<numRowBlocks; rb++)
@@ -351,7 +361,11 @@ final class ParallelMatrixMultiplicator implements MatrixMultiplicator
     @Override
     public String toString()
     {
-        return getClass().getSimpleName()+"["+subMatrixMultiplicatorFactory+"]";
+        return getClass().getSimpleName()+
+            "[subMatrixMultiplicatorFactory="+
+            subMatrixMultiplicatorFactory+","+
+            "executorServiceFactory="+
+            executorServiceFactory+"]";
     }
     
     /**
